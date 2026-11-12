@@ -4,20 +4,6 @@ Repositório contendo os scripts de estruturação de banco de dados geoespacial
 
 ---
 
-## Sobre o Projeto
-
-O avanço das fronteiras exploratórias de petróleo e gás na Bacia de Pelotas exige uma compreensão detalhada da biodiversidade marinha local para mitigar impactos ambientais, especialmente aqueles associados às pesquisas sísmicas e ao tráfego de embarcações. Este projeto integra dados biológicos de monitoramento marinho com ferramentas de Sistemas de Informação Geográfica (SIG) e Bancos de Dados Geográficos para avaliar a ocorrência de cetáceos na região.
-
-### Objetivo Geral
-Analisar a distribuição espaço-temporal de cetáceos nos blocos exploratórios de petróleo e gás na Bacia de Pelotas.
-
-### Objetivos Específicos
-* Mapear a ocorrência de cetáceos na região;
-* Comparar a eficácia e abrangência dos métodos de detecção visual (avistagens) e acústica (Monitoramento Acústico Passivo - PAM);
-* Analisar a sazonalidade de ocorrência por espécies;
-* Interpretar padrões espaciais das principais espécies registradas na região.
-
----
 
 ## Tecnologias e Ferramentas Utilizadas
 
@@ -75,4 +61,5 @@ install.packages(c("readODS", "DBI", "RPostgres", "janitor", "sf", "dplyr", "ggp
 
 ## Autoria
 
-Trabalho desenvolvido no âmbito do **Curso Técnico em Geoprocessamento — IFRS**.
+Trabalho desenvolvido por **Anna Carolina Torma**, orientada por **Tiago Gandra**, como trabalho de conclusão do **Curso Técnico em Geoprocessamento — IFRS**.
+Os dados utilizados e a demanda deste estudo foram fornecidos pela [BioSonar](https://www.biosonar.com.br/).
