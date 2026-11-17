@@ -1,65 +1,56 @@
-# Distribuição Espaço-Temporal de Cetáceos na Bacia de Pelotas
+# Estruturação de Banco de Dados Espacial para o Monitoramento de Mamíferos Marinhos em Levantamentos Sísmicos
 
-Repositório contendo os scripts de estruturação de banco de dados geoespacial, limpeza de dados e análises visuais para o Trabalho de Conclusão de Curso (TCC) do **Curso Técnico em Geoprocessamento** do **Instituto Federal do Rio Grande do Sul (IFRS)**.
+Repositório contendo os scripts de estruturação de banco de dados geoespacial, limpeza de dados, análise de esforço e visualização de resultados para o Trabalho de Conclusão de Curso (TCC) do **Curso Técnico em Geoprocessamento** do **Instituto Federal do Rio Grande do Sul (IFRS)**.
 
----
+## Sobre o Projeto
 
+O avanço das fronteiras exploratórias offshore exige um monitoramento rigoroso para mitigar os impactos da aquisição sísmica sobre a fauna marinha. Este projeto propõe a estruturação de um banco de dados espacial corporativo integrado a ferramentas de Sistema de Informação Geográfica (SIG) para processar, armazenar e analisar dados de ocorrência de mamíferos marinhos, englobando tanto avistagens visuais quanto detecções acústicas (Monitoramento Acústico Passivo - PAM).
 
-## Tecnologias e Ferramentas Utilizadas
+O grande diferencial analítico do projeto é a implementação de um cálculo de Esforço Amostral contínuo e a derivação de taxas de encontro espacializadas, permitindo a visualização precisa das áreas de maior densidade de animais em relação ao esforço empregado pelo navio sísmico.
 
-* **Linguagem de Programação:** R
-  * Manipulação e limpeza de dados: `dplyr`, `janitor`, `readODS`, `forcats`
-  * Geoprocessamento e dados espaciais: `sf`
-  * Conexão com Banco de Dados: `DBI`, `RPostgres`
-  * Visualização de dados: `ggplot2`
-* **Banco de Dados Espacial:** PostgreSQL + extensão **PostGIS**
-* **SIG Desktop:** QGIS (para integração com os blocos exploratórios da ANP e elaboração dos mapas temáticos)
+## Metodologia e Fluxo de Trabalho
 
----
+O processamento foi dividido em 4 etapas principais, automatizadas por meio de scripts em R e SQL:
 
-## Estrutura do Banco de Dados (PostGIS)
+### 1. Pré-processamento e Espacialização de Dados (R e pacote `sf`)
+* **Limpeza Taxonômica e de Dados:** Importação de planilhas de avistagens, detecções e navegação (`.ods` e `.csv`), com padronização de tipos de dados (tempo e texto).
+* **Espacialização de Ocorrências:** Transformação de coordenadas tabulares em geometrias do tipo ponto (`POINT`) utilizando o Sistema de Referência oficial **SIRGAS 2000 (EPSG:4674)**.
+* **Geração de Trilhas de Navegação:** Conversão de milhares de pontos de GPS em linhas contínuas (`LINESTRING`) agrupadas por dia de operação, reconstruindo a trajetória exata da embarcação.
+* **Malha Espacial (Grids):** Geração de grades regulares de 1 km e 10 km, filtradas espacialmente pelos limites da Amazônia Azul para excluir áreas terrestres.
 
-Os dados brutos provenientes de planilhas `.ods` são higienizados via R, convertidos em feições geométricas de pontos (`SIRGAS 2000 / EPSG:4674`) e armazenados no esquema `public` do PostgreSQL seguindo um modelo relacional:
+### 2. Estruturação do Banco de Dados Relacional Espacial (PostgreSQL + PostGIS)
+Os dados processados são ingeridos diretamente em um banco de dados PostGIS, estruturando o seguinte modelo lógico com integridade referencial:
+* `taxon`: Tabela dimensional atuando como chave primária (`PK`).
+* `sightings` e `detections`: Tabelas espaciais de pontos interligadas ao táxon por chave estrangeira (`FK`), garantindo que apenas espécies previamente cadastradas sejam inseridas.
+* `navigation_points` e `navigation_tracks`: Histórico de navegação.
+* Criação de Índices Espaciais (`GIST`) em todas as tabelas para otimização de consultas e renderização no SIG.
 
-| Tabela | Tipo | Chave Primária (PK) | Chave Estrangeira (FK) | Descrição |
-| :--- | :--- | :--- | :--- | :--- |
-| **`species`** | Alfanumérica | `taxon` (`TEXT`) | — | Dicionário taxonômico validado (Ordem, Subordem, Família, Gênero, Espécie e Táxon). |
-| **`sightings`** | Espacial (`POINT`) | `id_avist` (`TEXT`) | `taxon` $\rightarrow$ `species(taxon)` | Registros de avistagens visuais com coordenadas geográficas, horários e esforço amostral. |
-| **`detections`** | Espacial (`POINT`) | `id_detec` (`TEXT`) | `taxon` $\rightarrow$ `species(taxon)` | Registros de detecções acústicas passivas (PAM) espacializados. |
+### 3. Modelagem de Esforço e Taxa de Encontro (SQL Avançado)
+Toda a modelagem pesada ocorre dentro do banco de dados, utilizando funções nativas do PostGIS para máxima performance:
+* **Cálculo de Esforço (Quilometragem):** Criação de uma tabela física (`grid_10km_effort`) que calcula o comprimento geodésico exato das trilhas de navegação que cruzam cada célula da grade. Utilizou-se o tipo geométrico `::geography` para garantir cálculos perfeitos de distância sobre o elipsoide (GRS80), sem distorções de projeção.
+* **SPUE e DPUE:** Criação de uma Visão (`VIEW`) utilizando Common Table Expressions (CTEs) para cruzar a grade de esforço com os pontos de ocorrência, resultando em:
+  * $SPUE = \frac{Total de Avistagens}{Esforço (km)}$ (Sightings Per Unit Effort)
+  * $DPUE = \frac{Total de Deteccoes}{Esforço (km)}$ (Detections Per Unit Effort)
 
-* As tabelas espaciais possuem índices espaciais **GIST** configurados sobre a coluna geométrica (`geom`) para otimizar consultas espaciais e renderização no QGIS.
+### 4. Análise Visual e Gráficos
+Extração de dados agregados do banco via SQL diretamente para o R, utilizando o pacote `ggplot2` para elaboração de figuras em alta qualidade (300 dpi) destinadas ao documento acadêmico:
+* Comparativo taxonômico do número de avistagens vs. detecções por Subordem/Família.
+* Evolução temporal do esforço amostral diário (em quilômetros navegados).
 
----
+## Estrutura de Arquivos
 
-## Como Reproduzir o Fluxo de Trabalho
+* `01_import_data.R`: Script para leitura dos registros biológicos, importação para o banco, definição de restrições (PKs/FKs) e geração da malha amostral (grids).
+* `01_import_navigation_points.R`: Script para ingestão e conversão do log de navegação (pontos para linhas diárias).
+* `02_figures.R`: Script voltado a análises estatísticas descritivas, conectando-se ao PostGIS e gerando os gráficos de esforço e composição taxonômica.
+* `04_sql_esforco.sql`: Código em linguagem SQL executado no banco de dados para criar as tabelas e views analíticas que calculam o Esforço e as taxas SPUE/DPUE espacializadas.
 
-### 1. Pré-requisitos
-Certifique-se de ter o **R** (versão 4.1+) e um servidor **PostgreSQL/PostGIS** ativo. No console do R, instale os pacotes necessários:
+## Tecnologias e Ferramentas
 
-```R
-install.packages(c("readODS", "DBI", "RPostgres", "janitor", "sf", "dplyr", "ggplot2", "forcats"))
-```
-
-### 2. Etapas de Execução
-1. **Importação e Limpeza (`01_import_to_postgis.R`):**
-   * Lê as abas de avistagens, detecções e espécies do arquivo `.ods`;
-   * Padroniza nomes de colunas (`snake_case`), corrige inconsistências taxonômicas e converte tipos de dados de tempo (`TIME`);
-   * Transforma as coordenadas (`lon`, `lat`) em geometrias `POINT` (`EPSG:4674`) e exporta para o PostGIS;
-   * Define as restrições de integridade referencial (`PRIMARY KEY` e `FOREIGN KEY` com `ON UPDATE CASCADE`).
-2. **Análise Exploratória e Gráficos (`02_exploratory_plots.R`):**
-   * Consulta o banco de dados unificando (`UNION ALL`) avistagens visuais e detecções acústicas;
-   * Gera gráficos comparativos de ocorrência por Subordem e Família em alta resolução (`300 dpi`) para inclusão no documento final do TCC.
-
----
-
-## Principais Saídas (Outputs)
-
-* Tabelas espaciais estruturadas no PostGIS prontas para cruzamento espacial (`ST_Intersects`, mapas de Kernel, etc.) com os polígonos dos blocos exploratórios da Bacia de Pelotas;
-* Gráficos comparativos (`fig_sightings_vs_detections_family.png`) demonstrando a complementaridade entre o monitoramento visual e o acústico entre diferentes famílias de Odontoceti e Mysticeti.
-
----
+* **R (Tidyverse & sf):** Manipulação de dados, Geoprocessamento vetorial, integração com Banco de Dados e Data Visualization.
+* **PostgreSQL + PostGIS:** Armazenamento robusto e operações espaciais de alto desempenho.
+* **QGIS:** Software de mesa utilizado para o layout de mapas finais e validação das geometrias.
 
 ## Autoria
 
-Trabalho desenvolvido por **Anna Carolina Torma**, orientada por **Tiago Gandra**, como trabalho de conclusão do **Curso Técnico em Geoprocessamento — IFRS**.
-Os dados utilizados e a demanda deste estudo foram fornecidos pela [BioSonar](https://www.biosonar.com.br/).
+Trabalho desenvolvido por Anna Carolina Pinheiro Torma e orientado por Tiago Gandra no âmbito do **Curso Técnico em Geoprocessamento — IFRS**. Os dados utilizados e a demanda técnica de criação deste sistema de monitoramento foram gentilmente fornecidos pela empresa **BioSonar** ([https://www.biosonar.com.br/](https://www.biosonar.com.br/)).
+tiago.gandra@riogrande.ifrs.edu.br

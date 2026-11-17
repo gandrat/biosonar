@@ -180,7 +180,7 @@ sql_add_fk <- "
 "
 dbExecute(con, sql_add_fk)
 
-# Link public.sightings(taxon) -> public.species(taxon)
+# Link public.detection(taxon) -> public.species(taxon)
 sql_add_fk <- "
   ALTER TABLE public.detections
   ADD CONSTRAINT detections_species_fk
@@ -191,6 +191,55 @@ sql_add_fk <- "
 "
 dbExecute(con, sql_add_fk)
 
+# 7. Create grid to SPUE----------
+# Extract bounding box from the tracks to define the grid extent
+sightings_utm <- st_transform(sightings, crs = 10857)
 
-#7. Close database connection-------
-dbDisconnect(db_con)
+study_area_bbox <- st_bbox(sightings_utm)
+
+# Create a 10km  grid (square polygons)
+grid_base <- st_make_grid(
+  study_area_bbox,
+  cellsize = c(10000, 10000), 
+  square = TRUE
+)
+
+# Convert to an sf object and assign a unique ID to each cell
+grid_sf <- st_sf(
+  id = 1:length(grid_base),
+  geom = grid_base
+)
+
+
+grid_sf<-st_transform(grid_sf, crs=4674)
+
+## Droping grids on land
+mar <- read_sf(con, layer = "amazonia_azul")
+
+grid_sf<-grid_sf%>%st_filter(mar, .predicate = st_intersects)
+
+st_write(grid_sf, con, layer = "grid_10km", delete_layer = TRUE)
+
+# Create a 1000m x 1000m grid (square polygons)
+grid_base <- st_make_grid(
+  study_area_bbox,
+  cellsize = c(1000, 1000), 
+  square = TRUE
+)
+
+# Convert to an sf object and assign a unique ID to each cell
+grid_sf <- st_sf(
+  id = 1:length(grid_base),
+  geom = grid_base
+)
+
+
+grid_sf<-st_transform(grid_sf, crs=4674)
+
+## Droping grids on land
+grid_sf<-grid_sf%>%st_filter(mar, .predicate = st_intersects)
+
+st_write(grid_sf, con, layer = "grid_1km", delete_layer = TRUE)
+
+#8. Close database connection-------
+dbDisconnect(con)

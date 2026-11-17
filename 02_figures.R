@@ -25,7 +25,9 @@ con <- dbConnect(
 )
 
 
-# 2. Query and Aggregate Data (Sightings + Detections) -----
+# 2. Bar plot taxon----------
+
+## 2.1 Query and Aggregate Data (Sightings + Detections) -----
 
 # Fetch Cetacea records from both tables joined with taxonomic info
 sql_records <- "
@@ -51,11 +53,7 @@ sql_records <- "
 
 records_raw <- dbGetQuery(con, sql_records)
 
-# Close connection after fetching data
-dbDisconnect(db_con)
-
-
-# 3. Prepare Data for Plotting -----
+## 2.2. Prepare Data for Plotting -----
 
 plot_data <- records_raw |> 
   # Clean or standardize 'Indefinido' labels if needed
@@ -67,48 +65,7 @@ plot_data <- records_raw |>
   count(subordem, familia, suborder_family, record_type, name = "total_records")
 
 
-# 4. Option A: Grouped Bar Chart by Suborder and Family (Faceted) -----
-
-plot_faceted <- ggplot(
-  data = plot_data,
-  aes(
-    x = fct_reorder(familia, total_records, .fun = sum),
-    y = total_records,
-    fill = record_type
-  )
-) +
-  geom_col(position = position_dodge(preserve = "single"), width = 0.7) +
-  geom_text(
-    aes(label = total_records),
-    position = position_dodge(width = 0.7),
-    hjust = -0.2,
-    size = 3.5
-  ) +
-  facet_grid(subordem ~ ., scales = "free_y", space = "free_y") +
-  coord_flip() +
-  scale_fill_manual(
-    values = c(
-      "Avistagem (Visual)" = "#1f78b4",
-      "Detecção (Acústica)" = "#ff7f00"
-    )
-  ) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
-  labs(
-    x = "Família",
-    y = "Número de Registros",
-    fill = "Método de Registro"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "top",
-    panel.grid.minor = element_blank(),
-    strip.text.y = element_text(face = "bold", angle = 0)
-  )
-
-print(plot_faceted)
-
-
-# 5. Option B: Single Axis Combined Label (Suborder - Family) -----
+## 2.3. Option B: Single Axis Combined Label (Suborder - Family) -----
 
 plot_combined <- ggplot(
   data = plot_data,
@@ -147,13 +104,55 @@ plot_combined <- ggplot(
 print(plot_combined)
 
 
-# 6. Export High-Resolution Plot for TCC -----
-
+## 2.5. Export High-Resolution Plot for TCC -----
 ggsave(
-  filename = "figures/fig_sightings_vs_detections_family.jpg",
+  filename = "figures/avistagens_deteccao_taxon.jpg",
   plot = plot_combined,
   width = 17,
   height = 12,
+  units = "cm",
+  dpi = 300
+)
+
+
+
+
+# Extract just the date from the 'time' column and count occurrences
+navp_daily <- navp |> 
+  mutate(day = as.Date(time)) |> 
+  count(day, name = "total_points")
+
+
+# 3. Effort -----
+
+navt<-st_read(con, "navigation_tracks")
+navt<-navt%>%mutate(distance=as.numeric(st_length(geom))/1000)
+plot_daily_points <- ggplot(data = navt, aes(x = day, y = distance)) +
+  geom_col(fill = "#1f78b4", width = 0.7) + 
+  
+  # Format the X axis to show dates cleanly (e.g., "18 Apr")
+  scale_x_date(date_labels = "%m-%Y", date_breaks = "1 month") +
+  
+  # Ensure the Y axis starts exactly at 0 and adds a little space at the top
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  
+  labs(
+    x = 'Data',
+    y = "Distância (km)"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1) # Tilts date labels for better fit
+  )
+
+print(plot_daily_points)
+
+ggsave(
+  filename = "figures/esforco_data.jpg",
+  plot = plot_daily_points,
+  width = 17,
+  height = 10,
   units = "cm",
   dpi = 300
 )
